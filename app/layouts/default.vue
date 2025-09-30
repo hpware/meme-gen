@@ -5,6 +5,6 @@
     </main>
     <footer class="justify-center text-center flex flex-col">
         <span>Made using Bun, TailwindCSS, Nuxt, Vue, and tRPC</span>
-        <span>&copy; {{ new Date().toUTCYear() }} yh!</span>
+        <span>&copy; {{ new Date().getUTCFullYear() }} hpware</span>
     </footer>
 </template>
