@@ -7,7 +7,8 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
     "@googlemaps/markerclusterer": "^2.6.2",
@@ -18,11 +19,15 @@
     "@trpc/client": "^11.6.0",
     "@trpc/server": "^11.6.0",
     "@unhead/vue": "^2.0.3",
+    "drizzle-orm": "^0.44.5",
     "nuxt": "^4.1.2",
     "tailwindcss": "^4.1.13",
     "trpc-nuxt": "^1.2.0",
     "typescript": "^5.6.3",
     "vue": "^3.5.22",
     "vue-router": "^4.5.1"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.5"
   }
 }

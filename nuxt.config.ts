@@ -6,4 +6,7 @@ export default defineNuxtConfig({
   css: ["~/global.css"],
   modules: ["@nuxt/ui", "@nuxt/scripts", "@nuxt/image"],
   vite: { plugins: [tailwindcss()] },
+  build: {
+    transpile: ["trpc-nuxt"],
+  },
 });
