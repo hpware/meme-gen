@@ -1,10 +1,9 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core'
+import { integer, pgTable, text, uuid, timestamp } from "drizzle-orm/pg-core";
 
-export const users = sqliteTable('users', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  name: text('name').notNull(),
-  email: text('email').notNull().unique(),
-  password: text('password').notNull(),
-  avatar: text('avatar').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-})
+export const memes = pgTable("memes", {
+  uuid: uuid().defaultRandom().primaryKey(),
+  memeImage: text().notNull(),
+  aiGeneratedDescription: text().notNull().default("Unknown description"),
+  uploaded_by: text().notNull(),
+  uploaded_at: timestamp().defaultNow(),
+});
