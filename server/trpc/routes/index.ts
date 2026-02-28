@@ -7,11 +7,11 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 
 const openai = new OpenAI({
-  baseURL: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
+  baseURL: process.env.OPENAI_BASE_URL || "https://openrouter.ai/api/v1",
   apiKey: process.env.OPENAI_API_KEY || "",
   defaultHeaders: {
-    "HTTP-Referer": "https://yhw.tw/meme-gen",
-    "X-Title": "MemeGen",
+    "HTTP-Referer": "https://meme-gen.gemini.cli", // Required for OpenRouter rankings
+    "X-Title": "MemeGen CLI", // Required for OpenRouter rankings
   },
 });
 
@@ -74,7 +74,7 @@ export const appRouter = createTRPCRouter({
             {
               role: "system",
               content:
-                "What is in this image? Make it easier to understand as humans! Like 'This image is about a cat that is pointing fingers at each others'. Keep it short.",
+                "You are a sarcastic meme connoisseur. Look at the image provided and generate a short, funny, and engaging caption or description that captures the essence of the meme. Avoid being overly literal. Keep it under 2 sentences.",
             },
             {
               role: "user",
