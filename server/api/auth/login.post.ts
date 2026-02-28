@@ -29,12 +29,26 @@ export default defineEventHandler(async (event) => {
         msg: "密碼錯誤",
       };
     }
-    //setCookie(event, "dd", "dd");
-    //db.query();
-    // argon2.verify();
+
+    // Create session
+    const [session] = await db.insert(schema.sessions).values({
+      to_user: getUserAccount.uuid,
+    }).returning();
+
+    // Set cookie
+    setCookie(event, "auth_session", session.uuid, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24, // 1 day
+      path: "/",
+    });
+
     return {
       success: true,
-      msg: "",
+      user: {
+        email: getUserAccount.email,
+        uuid: getUserAccount.uuid,
+      },
     };
   } catch (e: any) {
     return {
