@@ -1,4 +1,5 @@
 import { baseProcedure, protectedProcedure, createTRPCRouter } from "~/../server/trpc/init";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { db, schema } from "../../database/";
 import OpenAI from "openai";
@@ -51,6 +52,25 @@ export const appRouter = createTRPCRouter({
     .mutation(async (opts) => {
       const { image } = opts.input;
       
+      // Basic size validation (approximate from base64 length)
+      // 10MB limit. 1.37 is the factor for base64 overhead.
+      if (image.length > 10 * 1024 * 1024 * 1.37) {
+        throw new TRPCError({
+          code: 'PAYLOAD_TOO_LARGE',
+          message: 'Image size exceeds 10MB limit.',
+        });
+      }
+
+      // Format validation
+      const match = image.match(/^data:image\/(png|jpeg|webp|gif);base64,/);
+      if (!match) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Invalid image format. Supported: PNG, JPEG, WEBP, GIF.',
+        });
+      }
+      const extension = match[1];
+
       // Ensure directory exists
       const uploadDir = path.join(process.cwd(), "public", "uploads");
       if (!fs.existsSync(uploadDir)) {
@@ -58,7 +78,7 @@ export const appRouter = createTRPCRouter({
       }
 
       // Generate filename
-      const filename = `${randomUUID()}.png`;
+      const filename = `${randomUUID()}.${extension}`;
       const filepath = path.join(uploadDir, filename);
       const publicUrl = `/uploads/${filename}`;
 

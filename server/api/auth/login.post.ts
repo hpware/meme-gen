@@ -1,32 +1,25 @@
 import { db, schema } from "~~/server/database";
+import { eq } from "drizzle-orm";
 import argon2 from "argon2";
 
 export default defineEventHandler(async (event) => {
   try {
-    const body: any = readBody(event);
-    if (!(body && body.email && body.password)) {
+    const body = await readBody(event);
+    if (!body || !body.email || !body.password) {
       return {
         success: false,
-        msg: "Awww shap, you don't have enough aura to use this api 🫥",
+        msg: "Email and password are required.",
       };
     }
+
     const getUserAccount = await db.query.accounts.findFirst({
-      with: {
-        email: body.email,
-      },
+      where: eq(schema.accounts.email, body.email),
     });
 
-    if (getUserAccount === undefined) {
+    if (!getUserAccount || !(await argon2.verify(getUserAccount.password, body.password))) {
       return {
         success: false,
-        msg: "這個帳號不存在 :(",
-      };
-    }
-
-    if (!(await argon2.verify(getUserAccount.password, body.password))) {
-      return {
-        success: false,
-        msg: "密碼錯誤",
+        msg: "Invalid email or password.",
       };
     }
 
