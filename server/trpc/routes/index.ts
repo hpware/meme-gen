@@ -1,14 +1,18 @@
-import { baseProcedure, createTRPCRouter } from "~/../server/trpc/init";
+import { baseProcedure, protectedProcedure, createTRPCRouter } from "~/../server/trpc/init";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { db, schema } from "../../database/";
 import OpenAI from "openai";
+import fs from "node:fs";
+import path from "node:path";
+import { randomUUID } from "node:crypto";
 
 const openai = new OpenAI({
-  baseURL: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
+  baseURL: process.env.OPENAI_BASE_URL || "https://openrouter.ai/api/v1",
   apiKey: process.env.OPENAI_API_KEY || "",
   defaultHeaders: {
-    "HTTP-Referer": "https://yhw.tw/meme-gen",
-    "X-Title": "MemeGen",
+    "HTTP-Referer": "https://meme-gen.gemini.cli", // Required for OpenRouter rankings
+    "X-Title": "MemeGen CLI", // Required for OpenRouter rankings
   },
 });
 
@@ -24,53 +28,109 @@ export const appRouter = createTRPCRouter({
         greeting: `hello ${opts.input.text}`,
       };
     }),
+
   getNewImages: baseProcedure.query(() => {
     return {
       image: "https://copyparty.yhw.tw/pb_web/catpizzaitalian.png",
       ai_text_explain: "This is a cat holding a pizza",
     };
   }),
-  uploadImage: baseProcedure
-    /**    .input(
-  z.object({
-    image: z.string(), // base64 encoded image or file path
-    filename: z.string().optional(),
-    mimeType: z.string().optional(),
+
+  getMemes: baseProcedure.query(async () => {
+    const memes = await db.query.memes.findMany({
+      orderBy: (memes, { desc }) => [desc(memes.uploaded_at)],
+    });
+    return memes;
   }),
-) */
-    .query(async (opts) => {
-      //const { image, filename, mimeType } = opts.input;
-      // const savedPath = await saveImage(image, filename);
-      const completion = await openai.chat.completions.create({
-        model: process.env.ANALYZE_AI_MODEL || "openai/gpt-4o", // default model
-        messages: [
-          {
-            role: "system",
-            content:
-              "What is in this image? Make it easier to understand as humans! Like 'This image is about a cat that is pointing fingers at each others'.",
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "image_url",
-                image_url: {
-                  url: "https://copyparty.yhw.tw/pb_web/catpizzaitalian.png",
+
+  uploadImage: protectedProcedure
+    .input(
+      z.object({
+        image: z.string(), // base64 encoded image
+      }),
+    )
+    .mutation(async (opts) => {
+      const { image } = opts.input;
+      
+      // Basic size validation (approximate from base64 length)
+      // 10MB limit. 1.37 is the factor for base64 overhead.
+      if (image.length > 10 * 1024 * 1024 * 1.37) {
+        throw new TRPCError({
+          code: 'PAYLOAD_TOO_LARGE',
+          message: 'Image size exceeds 10MB limit.',
+        });
+      }
+
+      // Format validation
+      const match = image.match(/^data:image\/(png|jpeg|webp|gif);base64,/);
+      if (!match) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Invalid image format. Supported: PNG, JPEG, WEBP, GIF.',
+        });
+      }
+      const extension = match[1];
+
+      // Ensure directory exists
+      const uploadDir = path.join(process.cwd(), "public", "uploads");
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+
+      // Generate filename
+      const filename = `${randomUUID()}.${extension}`;
+      const filepath = path.join(uploadDir, filename);
+      const publicUrl = `/uploads/${filename}`;
+
+      // Save file
+      const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
+      fs.writeFileSync(filepath, base64Data, 'base64');
+
+      let aiDescription = "Unknown";
+      try {
+        const completion = await openai.chat.completions.create({
+          model: process.env.ANALYZE_AI_MODEL || "gpt-4o",
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are a sarcastic meme connoisseur. Look at the image provided and generate a short, funny, and engaging caption or description that captures the essence of the meme. Avoid being overly literal. Keep it under 2 sentences.",
+            },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: "Describe this image."
                 },
-              },
-            ],
-          },
-        ],
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: image, // OpenAI supports base64 URLs
+                  },
+                },
+              ],
+            },
+          ],
+        });
+        aiDescription = completion.choices[0].message.content || "Unknown";
+      } catch (e) {
+        console.error("OpenAI error:", e);
+      }
+
+      // Save to DB
+      await db.insert(schema.memes).values({
+        memeImage: publicUrl,
+        aiGeneratedDescription: aiDescription,
+        uploaded_by: opts.ctx.user.uuid,
       });
-      const status = completion;
+
       return {
         success: true,
-        message: "Image uploaded successfully",
-        content: status,
-        // imageUrl: savedPath,
+        image: publicUrl,
+        ai_text_explain: aiDescription,
       };
     }),
 });
 
-// export type definition of API
 export type AppRouter = typeof appRouter;
